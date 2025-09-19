@@ -98,6 +98,7 @@ export function Reports() {
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
 
   // Enhanced mock data for charts
   const [inspectionData] = useState([
@@ -133,7 +134,7 @@ export function Reports() {
   }, []);
 
   const setupRealTimeUpdates = () => {
-    const q = query(collection(db, 'transactions'), orderBy('createdAt', 'desc'), limit(100));
+    const q = query(collection(db, 'transactions'), orderBy('createdAt', 'desc'), limit(50));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const transactions = snapshot.docs.map(doc => {
@@ -148,6 +149,8 @@ export function Reports() {
       // Process real-time data
       const processedData = processRealTimeData(transactions);
       setRealTimeData(processedData);
+      // Keep a slim recent list for UI cards
+      setRecentTransactions(transactions.slice(0, 20));
       setLastUpdate(new Date());
       setIsLoading(false);
     });
@@ -694,6 +697,68 @@ Last Updated: ${lastUpdate.toLocaleString()}
           icon={<TrendingUp className="h-6 w-6" />}
         />
       </div>
+
+      {/* Recent Transactions - Mobile-first card grid */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Recent Transactions</h3>
+              <p className="text-sm text-gray-500">Live updates from blockchain and Firestore</p>
+            </div>
+            <Badge variant="info">{recentTransactions.length}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {recentTransactions.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">No recent activity</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {recentTransactions.map((tx: any, idx: number) => (
+                <div
+                  key={`${tx.id}-${idx}`}
+                  className="border border-gray-200 rounded-lg p-3 bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm hover:shadow-md active:scale-[0.99]"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 capitalize">{tx.eventType || 'event'}</span>
+                        {typeof tx.blockNumber === 'number' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-50 text-green-700"># {tx.blockNumber}</span>
+                        )}
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500">{new Date(tx.createdAt).toLocaleString()}</div>
+                    </div>
+                    <div className="text-right">
+                      <Badge size="sm" variant={(tx.status || 'confirmed') === 'confirmed' ? 'success' : (tx.status || 'pending') === 'pending' ? 'warning' : 'error'}>
+                        {tx.status || 'confirmed'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    <div className="text-[11px] text-gray-600">Part Hash</div>
+                    <div className="font-mono text-xs text-gray-800 break-all truncate">{tx.partHash || tx.fittingId || '-'}</div>
+                    {tx.transactionHash && (
+                      <div className="mt-2">
+                        <div className="text-[11px] text-gray-600">Tx Hash</div>
+                        <a
+                          href={`https://testnet.bscscan.com/tx/${tx.transactionHash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono text-xs text-blue-700 hover:text-blue-900 break-all truncate"
+                          title={tx.transactionHash}
+                        >
+                          {tx.transactionHash}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Report Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

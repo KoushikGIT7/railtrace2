@@ -603,17 +603,16 @@ export function BlockchainAudit() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <h3 className="text-lg font-semibold text-gray-900">Part Lookup & Blockchain Verification</h3>
-          <p className="text-sm text-gray-600">Search by part hash or browse recent parts</p>
-        </CardHeader>
-        <CardContent className="p-4">
-          <div className="space-y-4">
-            {/* Search Methods */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-semibold text-gray-900">Part Lookup & Blockchain Verification</h3>
+            <p className="text-sm text-gray-600">Search by part hash</p>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="space-y-4">
+              {/* Search Input */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Method 1: Direct Part Hash</label>
+                <label className="text-sm font-medium text-gray-700">Part Hash</label>
                 <input
                   type="text"
                   placeholder="0x32d66592a1469a72e5c5531d4a14360925665d57d64dea016f8993ecd86edb46"
@@ -624,59 +623,46 @@ export function BlockchainAudit() {
                   autoComplete="off"
                 />
               </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Method 2: Recent Parts</label>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2 items-stretch sm:items-center">
                 <Button 
                   variant="outline" 
-                  className="w-full justify-start"
-                  leftIcon={<Package className="h-4 w-4" />}
-                  onClick={loadRecentTransactions}
+                  onClick={() => loadFromChainByPartHash(partHashInput)} 
+                  leftIcon={<RefreshCw className="h-4 w-4" />}
+                  disabled={!partHashInput}
+                  className="w-full sm:w-auto transition-all duration-200 hover:shadow-md active:scale-[0.99]"
                 >
-                  Browse Recent Parts
+                  <span className="hidden sm:inline">Load from Blockchain</span>
+                  <span className="sm:hidden">Load Blockchain</span>
                 </Button>
+                
+                <select
+                  value={statusFilter} 
+                  onChange={(e) => setStatusFilter(e.target.value as any)} 
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-full sm:w-auto"
+                >
+                  <option value="all">All Status</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="pending">Pending</option>
+                  <option value="failed">Failed</option>
+                </select>
+                
+                <Button
+                  variant="outline"
+                  onClick={exportAuditReport}
+                  leftIcon={<Download className="h-4 w-4" />}
+                  className="w-full sm:w-auto transition-all duration-200 hover:shadow-md active:scale-[0.99]"
+                >
+                  <span className="hidden sm:inline">Export CSV</span>
+                  <span className="sm:hidden">Export</span>
+                </Button>
+                
+                {isTxEnriching && <span className="text-xs text-gray-500 text-center sm:text-left">Fetching tx hashes…</span>}
               </div>
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row flex-wrap gap-2 items-stretch sm:items-center">
-              <Button 
-                variant="outline" 
-                onClick={() => loadFromChainByPartHash(partHashInput)} 
-                leftIcon={<RefreshCw className="h-4 w-4" />}
-                disabled={!partHashInput}
-                className="w-full sm:w-auto"
-              >
-                <span className="hidden sm:inline">Load from Blockchain</span>
-                <span className="sm:hidden">Load Blockchain</span>
-              </Button>
-              
-              <select
-                value={statusFilter} 
-                onChange={(e) => setStatusFilter(e.target.value as any)} 
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-full sm:w-auto"
-              >
-                <option value="all">All Status</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="pending">Pending</option>
-                <option value="failed">Failed</option>
-              </select>
-              
-              <Button
-                variant="outline"
-                onClick={exportAuditReport}
-                leftIcon={<Download className="h-4 w-4" />}
-                className="w-full sm:w-auto"
-              >
-                <span className="hidden sm:inline">Export CSV</span>
-                <span className="sm:hidden">Export</span>
-              </Button>
-              
-              {isTxEnriching && <span className="text-xs text-gray-500 text-center sm:text-left">Fetching tx hashes…</span>}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
       <Card>
         <CardHeader>
