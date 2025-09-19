@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: railtrace-relayer
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: BSC_TESTNET_RPC_URL
+        value: https://data-seed-prebsc-1-s1.binance.org:8545/
+        sync: false
+      - key: CONTRACT_ADDRESS
+        value: 0x265c23BE0D06a5B07775A594F00E20d505eFBA2c
+        sync: false
+      - key: PRIVATE_KEY
+        sync: false
+        fromDatabase:
+          name: railtrace-secrets
+          property: private_key
