@@ -100,6 +100,35 @@ export function Reports() {
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
 
+  // Helpers: mobile-first key:value rendering
+  const KeyValueRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="flex items-start justify-between gap-3 py-1">
+      <span className="text-[12px] sm:text-sm text-gray-600 whitespace-nowrap flex-shrink-0">{label}</span>
+      <span className="text-[12px] sm:text-sm text-gray-900 font-medium break-words text-right w-full">{value}</span>
+    </div>
+  );
+
+  const renderNestedObject = (obj: Record<string, any>) => {
+    if (!obj || typeof obj !== 'object') return null;
+    const entries = Object.entries(obj);
+    if (entries.length === 0) return null;
+    return (
+      <div className="rounded-md border border-gray-200 bg-gray-50 p-2 sm:p-3 space-y-1">
+        {entries.map(([k, v]) => (
+          <KeyValueRow
+            key={k}
+            label={k}
+            value={typeof v === 'object' && v !== null ? (
+              <span className="font-mono text-[11px] sm:text-xs break-words">{JSON.stringify(v)}</span>
+            ) : (
+              <span className="break-words">{String(v)}</span>
+            )}
+          />
+        ))}
+      </div>
+    );
+  };
+
   // Enhanced mock data for charts
   const [inspectionData] = useState([
     { month: 'Jan', passed: 45, failed: 5, pending: 10, registered: 20, installed: 18, retired: 2 },
@@ -698,7 +727,7 @@ Last Updated: ${lastUpdate.toLocaleString()}
         />
       </div>
 
-      {/* Recent Transactions - Mobile-first card grid */}
+      {/* Recent Transactions - Mobile-first card grid with horizontal key:value rows */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -735,21 +764,28 @@ Last Updated: ${lastUpdate.toLocaleString()}
                       </Badge>
                     </div>
                   </div>
-                  <div className="mt-3 space-y-2">
-                    <div className="text-[11px] text-gray-600">Part Hash</div>
-                    <div className="font-mono text-xs text-gray-800 break-all truncate">{tx.partHash || tx.fittingId || '-'}</div>
+                  <div className="mt-3">
+                    <KeyValueRow label="Part Hash" value={<span className="font-mono">{tx.partHash || tx.fittingId || '-'}</span>} />
                     {tx.transactionHash && (
+                      <KeyValueRow
+                        label="Tx Hash"
+                        value={
+                          <a
+                            href={`https://testnet.bscscan.com/tx/${tx.transactionHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-mono text-blue-700 hover:text-blue-900 break-all"
+                            title={tx.transactionHash}
+                          >
+                            {tx.transactionHash}
+                          </a>
+                        }
+                      />
+                    )}
+                    {tx.data && typeof tx.data === 'object' && (
                       <div className="mt-2">
-                        <div className="text-[11px] text-gray-600">Tx Hash</div>
-                        <a
-                          href={`https://testnet.bscscan.com/tx/${tx.transactionHash}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-mono text-xs text-blue-700 hover:text-blue-900 break-all truncate"
-                          title={tx.transactionHash}
-                        >
-                          {tx.transactionHash}
-                        </a>
+                        <KeyValueRow label="Data" value={<span /> } />
+                        {renderNestedObject(tx.data)}
                       </div>
                     )}
                   </div>
@@ -1036,7 +1072,7 @@ Last Updated: ${lastUpdate.toLocaleString()}
         </CardContent>
       </Card>
 
-      {/* Report List */}
+      {/* Report List - Mobile optimized with clear Download placement */}
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1063,39 +1099,36 @@ Last Updated: ${lastUpdate.toLocaleString()}
           {filteredReports.length > 0 ? (
             <div className="space-y-4">
               {filteredReports.map((report) => (
-                <div key={report.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      {getTypeIcon(report.type)}
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900">{report.title}</h4>
-                      <div className="flex items-center space-x-4 text-sm text-gray-600">
-                        <span className="capitalize">{report.category}</span>
-                        <span>•</span>
-                        <span>{report.period}</span>
-                        <span>•</span>
-                        <span>{report.generatedAt.toLocaleString()}</span>
+                <div key={report.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        {getTypeIcon(report.type)}
                       </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    {getStatusBadge(report.status)}
-                    {report.status === 'ready' && (
-                      <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => downloadReport(report)}
-                        leftIcon={<Download className="h-4 w-4" />}
-                      >
-                        Download
-                      </Button>
-                        <div className="text-xs text-gray-500">
-                          {report.type === 'summary' ? 'TXT' : report.type === 'detailed' ? 'JSON' : 'CSV'}
+                      <div>
+                        <h4 className="font-medium text-gray-900">{report.title}</h4>
+                        <div className="flex flex-wrap items-center gap-x-2 text-sm text-gray-600">
+                          <span className="capitalize">{report.category}</span>
+                          <span>•</span>
+                          <span>{report.period}</span>
+                          <span>•</span>
+                          <span>{report.generatedAt.toLocaleString()}</span>
                         </div>
                       </div>
-                    )}
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                      {getStatusBadge(report.status)}
+                      {report.status === 'ready' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => downloadReport(report)}
+                          leftIcon={<Download className="h-4 w-4" />}
+                        >
+                          Download {report.type === 'summary' ? 'TXT' : report.type === 'detailed' ? 'JSON' : 'CSV'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
