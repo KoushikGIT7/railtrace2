@@ -1,0 +1,27 @@
+PROJECT BEFORE vs AFTER (SIMPLE LIST)
+
+INITIAL (BEFORE)
+- Basic React + Vite setup with Tailwind
+- UI not mobile-friendly; cramped cards and overflow issues
+- Reports section: plain layout, hard to scan on phones
+- Blockchain Audit: long hashes overflowing; no copy; block numbers missing
+- AI Analytics: unreliable Gemini JSON responses causing errors
+- Mixed/unused UI elements (e.g., Browse Recent Part); some unused icons/imports
+- Netlify deployment issues (submodule confusion; package.json not found)
+- No reusable components for truncation/copy/skeleton states
+- Real-time experience limited; charts not consistently populated
+
+IMPROVEMENTS & INTEGRATIONS (AFTER)
+- Mobile-first redesign across dashboard sections (clean spacing, rounded cards, shadows)
+- Generate Report: stacked controls on mobile, large clear buttons, no overflow
+- Generated Reports: new ReportCard component; responsive grid; clear status + one-tap download
+- Blockchain Audit: compact cards with key:value rows, block numbers shown, hashes truncated + copy
+- Removed “Browse Recent Part”; kept direct part-hash input only
+- AI Analytics stabilized with mock-first data + real-time processing; JSON parse errors eliminated
+- Reusable components added: TruncatedText, CopyButton, Skeleton, ReportCard (TypeScript)
+- Real-time Firestore onSnapshot feeds stats and recent transactions; mock fills charts as fallback
+- Netlify build fixed (removed backend submodule from frontend repo); Vite env vars standardized (VITE_*)
+- Backend relayer hosted (Railway) and integrated via VITE_RELAYER_ENDPOINT
+- Linter clean-up: unique keys, removed unused imports/icons, tidier types
+
+END

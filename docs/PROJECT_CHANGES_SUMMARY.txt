@@ -1,0 +1,56 @@
+RAILTRACE – CHANGES SUMMARY (BLOCKCHAIN, SERVER, DATA FLOW)
+
+1) Blockchain Relayer (Server)
+- Purpose: bridge frontend to BSC Testnet smart contract via simple HTTP.
+- Stack: Node.js + ethers.js. Hosting: Railway.
+- Key endpoints:
+  - GET /relayer/health → { ok: true, timestamp }
+  - GET /relayer/getPartHistory?partHash=0x... → ordered on-chain events
+- Output fields: transactionHash, blockNumber, eventType, data (decoded), timestamp.
+
+2) Frontend ↔ Relayer Integration
+- Single base URL via env: VITE_RELAYER_ENDPOINT.
+- Frontend service calls relayer and normalizes events to app types.
+- Block numbers included by fetching transaction receipts and merging into events.
+
+3) Firestore Real-Time Pipeline
+- Collection: transactions.
+- Frontend subscribes via onSnapshot for live updates (stats, recent activity, reports).
+- Event shape stored: { partHash, eventType, data, transactionHash, blockNumber, status, createdAt }.
+- Demo: two console snippets to create lifecycles/streams for real-time testing.
+
+4) Hybrid Data Strategy (Stability)
+- Gemini API disabled for analytics due to malformed JSON.
+- Analytics now use mock datasets + real-time processing of Firestore/relayer data.
+- Ensures charts and metrics remain populated even with sparse live data.
+
+5) Deployment & Repo Fixes
+- Removed embedded backend/submodule from frontend repo to fix Netlify builds.
+- Netlify base directory left empty; build = npm run build; publish = dist.
+- Railway hosts the relayer; verified health endpoint returns { ok: true }.
+
+6) Environment Variables (Frontend)
+- VITE_RELAYER_ENDPOINT = https://<railway-app>/relayer
+- VITE_CONTRACT_ADDRESS = 0x...
+- VITE_BLOCKCHAIN_RPC_URL = https://data-seed-prebsc-1-s1.binance.org:8545/
+- Firebase web config:
+  - VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID
+  - VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID
+- Note: Set in Netlify site settings; do not commit keys.
+
+7) Reliability Improvements
+- JSON parsing errors eliminated (Gemini off, mock-first analytics).
+- Unique React keys enforced; unused imports/icons removed; linter clean.
+- Blockchain service enriched with blockNumber for all displayed transactions.
+
+8) How Data Flows (High-Level)
+- User action or demo script writes a transaction to Firestore OR relayer fetches on-chain events.
+- UI subscribes to Firestore for real-time updates; merges relayer data when requested (audit).
+- Reports/analytics read the same normalized data; mock fills any gaps.
+
+WHAT TO SAY IN 3 LINES
+- “We added a Railway-hosted relayer (Node + ethers) that exposes part history from BSC Testnet.”
+- “Frontend now consumes relayer data, includes block numbers, and streams Firestore updates live.”
+- “Netlify deploy fixed; env vars standardized (VITE_*); analytics stabilized by mock+realtime blend.”
+
+END
