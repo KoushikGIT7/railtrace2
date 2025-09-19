@@ -15,7 +15,9 @@ import {
 import { Card, CardContent, CardHeader } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { CopyButton } from '../ui/CopyButton';
 import { StatsCard } from './StatsCard';
+import { Skeleton } from '../ui/Skeleton';
 import { blockchainService } from '../../services/blockchainService';
 import { ethers } from 'ethers';
 import { collection, query, where, getDocs, orderBy, doc, setDoc, limit, onSnapshot } from 'firebase/firestore';
@@ -687,9 +689,20 @@ export function BlockchainAudit() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-8">
-              <RefreshCw className="h-8 w-8 text-blue-500 mx-auto mb-4 animate-spin" />
-              <p className="text-gray-600">Loading blockchain data...</p>
+            <div className="space-y-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (records.length > 0 ? records : recentRecords).length > 0 ? (
             <div className="space-y-4">
@@ -719,16 +732,17 @@ export function BlockchainAudit() {
 
                       {/* Compact Info Row - Always Visible */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center gap-2 min-w-0">
                           <Hash className="h-4 w-4 text-gray-500" />
                           <span className="text-xs text-gray-600">Part Hash:</span>
                           <span className="font-mono text-xs text-gray-800 truncate" title={record.fittingId}>
-                            {record.fittingId.substring(0, 20)}...
+                            {record.fittingId}
                           </span>
+                          <CopyButton value={record.fittingId} size="sm" />
                         </div>
                         
                         {record.transactionHash && (
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <Shield className="h-4 w-4 text-gray-500" />
                             <span className="text-xs text-gray-600">Tx Hash:</span>
                             <a 
@@ -738,8 +752,9 @@ export function BlockchainAudit() {
                               rel="noreferrer"
                               title={record.transactionHash}
                             >
-                              {record.transactionHash.substring(0, 20)}...
+                              {record.transactionHash}
                             </a>
+                            <CopyButton value={record.transactionHash} size="sm" />
                           </div>
                         )}
                         

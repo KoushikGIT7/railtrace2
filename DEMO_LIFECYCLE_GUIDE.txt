@@ -1,0 +1,132 @@
+RAILTRACE DEMO GUIDE (TXT)
+==========================
+
+Purpose
+- Use this guide to demo the full app on mobile and desktop: Blockchain Audit, AI Analytics, and Reports.
+- Includes a realistic end-to-end part lifecycle with copy-paste Firestore records.
+
+Prerequisites
+- Frontend deployed on Netlify (connected to this GitHub repo).
+- Backend relayer is online (health check returns {"ok":true}).
+- Firebase project configured and VITE_ env vars set in Netlify.
+
+Suggested Demo Flow (5–7 minutes)
+1) Open the live site on a phone (or dev tools mobile view).
+2) Sign in as Admin.
+3) Go to Reports and show real-time cards + charts.
+4) Go to Blockchain Audit → paste the Part Hash and Load From Chain (or show cached).
+5) Return to AI Analytics to show mock + real-time blending.
+6) Show Downloads (TXT/JSON/CSV) on Reports and the new mobile-first layout.
+
+Sample Part for Demo
+- Part Hash: 0xDEMO0000000000000000000000000000000000000000000000000000000001
+- Vendor: VENDOR-002 (Track Solutions Ltd.)
+- Specifications: { type: "Bolt", material: "Iron", grade: "B" }
+
+Add Mock Lifecycle via Firestore Console
+Collection: transactions
+- Create 5 documents in order (timestamps within the last 30 days). Use Firestore Timestamp for createdAt.
+- You can keep document IDs auto-generated. Fields below are exact names the UI reads.
+
+1) Registered
+{
+  "eventType": "registered",
+  "partHash": "0xDEMO0000000000000000000000000000000000000000000000000000000001",
+  "fittingId": "0xDEMO0000000000000000000000000000000000000000000000000000000001",
+  "status": "confirmed",
+  "createdAt": <Timestamp(now - 5 days)>,
+  "transactionHash": "0xreg111111111111111111111111111111111111111111111111111111111",
+  "blockNumber": 4012345,
+  "data": {
+    "vendorId": "VENDOR-002",
+    "vendorName": "Track Solutions Ltd.",
+    "lotId": "BATCH-002",
+    "manufactureDate": "2025-01-16T19:50:00.000Z",
+    "specifications": { "type": "Bolt", "material": "Iron", "grade": "B" }
+  }
+}
+
+2) Received
+{
+  "eventType": "received",
+  "partHash": "0xDEMO0000000000000000000000000000000000000000000000000000000001",
+  "fittingId": "0xDEMO0000000000000000000000000000000000000000000000000000000001",
+  "status": "confirmed",
+  "createdAt": <Timestamp(now - 4 days)>,
+  "transactionHash": "0xrec222222222222222222222222222222222222222222222222222222222",
+  "blockNumber": 4012380,
+  "data": {
+    "depotId": "DEPOT-001",
+    "location": "Main Yard",
+    "officerId": "OFF-001",
+    "condition": "good"
+  }
+}
+
+3) Installed
+{
+  "eventType": "installed",
+  "partHash": "0xDEMO0000000000000000000000000000000000000000000000000000000001",
+  "fittingId": "0xDEMO0000000000000000000000000000000000000000000000000000000001",
+  "status": "confirmed",
+  "createdAt": <Timestamp(now - 3 days)>,
+  "transactionHash": "0xins333333333333333333333333333333333333333333333333333333333",
+  "blockNumber": 4012450,
+  "data": {
+    "trackId": "TRACK-007",
+    "lineSection": "Blue Line / S2",
+    "installerId": "ENG-045",
+    "torqueNm": 65
+  }
+}
+
+4) Inspected (Passed)
+{
+  "eventType": "inspected",
+  "partHash": "0xDEMO0000000000000000000000000000000000000000000000000000000001",
+  "fittingId": "0xDEMO0000000000000000000000000000000000000000000000000000000001",
+  "status": "confirmed",
+  "createdAt": <Timestamp(now - 2 days)>,
+  "transactionHash": "0xins444444444444444444444444444444444444444444444444444444444",
+  "blockNumber": 4012600,
+  "data": {
+    "inspectorId": "INSP-012",
+    "result": "passed",
+    "resultCode": 0,
+    "notes": "No anomalies detected",
+    "metrics": { "vibration": 0.12, "tempC": 31.4 }
+  }
+}
+
+5) Retired (Optional to show lifecycle end)
+{
+  "eventType": "retired",
+  "partHash": "0xDEMO0000000000000000000000000000000000000000000000000000000001",
+  "fittingId": "0xDEMO0000000000000000000000000000000000000000000000000000000001",
+  "status": "confirmed",
+  "createdAt": <Timestamp(now - 1 day)>,
+  "transactionHash": "0xret555555555555555555555555555555555555555555555555555555555",
+  "blockNumber": 4012801,
+  "data": {
+    "reason": "Scheduled replacement",
+    "officerId": "OFF-003",
+    "disposalMethod": "Recycled"
+  }
+}
+
+What the Audience Should Notice
+- Blockchain Audit: Clean collapsible cards, block numbers, tx hashes, and the horizontal key:value layout (labels left, values right). Data section shows nested Specifications in a tidy block.
+- Reports: Real-time stats update as you add documents; mobile-first cards; clear Download buttons (TXT/JSON/CSV) and a Download All exporter.
+- AI Analytics: Uses rich mock insights plus reacts to new Firestore events for trends and metrics.
+
+Pro Tips During Demo
+- Use the Refresh button in Reports to force a visual update timestamp.
+- Tap any transaction hash to open BscScan (tx link) on mobile.
+- Copy Part Hash easily from the expanded card in Blockchain Audit.
+
+Rollback / Cleanup
+- Delete the demo documents from the transactions collection after the demo, or change partHash to keep history.
+
+Notes
+- If Firestore composite index errors appear, we already avoided server-side orderBy in Blockchain Audit; client-side sorting is used to prevent index issues.
+- Gemini API is mocked for reliability; analytics still blends with real data updates.
