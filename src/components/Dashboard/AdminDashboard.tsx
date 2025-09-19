@@ -23,6 +23,9 @@ import {
   Line
 } from 'recharts';
 import { geminiService, VendorAnalysis } from '../../config/gemini';
+import { collection, onSnapshot, orderBy, limit, query } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import { blockchainService, BlockchainEvent } from '../../services/blockchainService';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
@@ -32,6 +35,15 @@ export function AdminDashboard() {
   const [defectTrendData, setDefectTrendData] = useState<{month: string; defects: number}[]>([]);
   const [fittingTypesData, setFittingTypesData] = useState<{name: string; value: number}[]>([]);
   const [stats, setStats] = useState<{ fittings?: number; pending?: number; critical?: number; records?: number }>({});
+  const [liveEvents, setLiveEvents] = useState<Array<{
+    id: string;
+    source: 'mock' | 'firestore' | 'blockchain';
+    title: string;
+    subtitle: string;
+    status: 'confirmed' | 'pending' | 'failed' | 'info';
+    createdAt: Date;
+  }>>([]);
+  const [isRealtimeLoading, setIsRealtimeLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
@@ -110,11 +122,66 @@ export function AdminDashboard() {
             setVendorAnalysis(mockVendorAnalysis);
           }
         }
+        // Seed mock live events for initial demo
+        const mockLive: typeof liveEvents = [
+          { id: `mock-1`, source: 'mock', title: 'Fitting Manufactured', subtitle: 'Batch BATCH-2024-001', status: 'confirmed', createdAt: new Date(Date.now() - 2 * 60 * 1000) },
+          { id: `mock-2`, source: 'mock', title: 'Installation Recorded', subtitle: 'Blue Line / S2', status: 'confirmed', createdAt: new Date(Date.now() - 15 * 60 * 1000) },
+          { id: `mock-3`, source: 'mock', title: 'Inspection Completed', subtitle: 'Passed - No anomalies', status: 'confirmed', createdAt: new Date(Date.now() - 60 * 60 * 1000) },
+        ];
+        setLiveEvents(mockLive);
       } finally {
         setIsLoadingAI(false);
       }
     };
     load();
+  }, []);
+
+  // Realtime: Firestore + Blockchain contract events
+  useEffect(() => {
+    setIsRealtimeLoading(true);
+    // Firestore recent transactions
+    const qFs = query(collection(db, 'transactions'), orderBy('createdAt', 'desc'), limit(25));
+    const unsubFs = onSnapshot(qFs, (snap) => {
+      const fsEvents: typeof liveEvents = snap.docs.map(d => {
+        const v = d.data() as any;
+        return {
+          id: `fs-${d.id}`,
+          source: 'firestore' as const,
+          title: `${(v.eventType || 'event').toString().toUpperCase()}`,
+          subtitle: (v.partHash || v.fittingId || '').toString(),
+          status: (v.status || 'confirmed') as 'confirmed' | 'pending' | 'failed' | 'info',
+          createdAt: v.createdAt?.toDate ? v.createdAt.toDate() : new Date(),
+        };
+      });
+      setLiveEvents(prev => {
+        const others = prev.filter(p => !p.id.startsWith('fs-'));
+        const merged = [...fsEvents, ...others].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        return merged.slice(0, 60);
+      });
+      setIsRealtimeLoading(false);
+    });
+
+    // Blockchain contract events (websocket-less fallback via internal subscription)
+    const unsubChain = blockchainService.subscribeToEvents((events: BlockchainEvent[]) => {
+      const newChain = events.map((e, idx) => ({
+        id: `bc-${e.transactionHash || e.partHash}-${idx}-${Date.now()}`,
+        source: 'blockchain' as const,
+        title: `${e.eventType.toUpperCase()}`,
+        subtitle: e.partHash,
+        status: 'confirmed' as const,
+        createdAt: new Date(e.timestamp * 1000),
+      }));
+      setLiveEvents(prev => {
+        const merged = [...newChain, ...prev].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        return merged.slice(0, 60);
+      });
+      setIsRealtimeLoading(false);
+    });
+
+    return () => {
+      unsubFs();
+      unsubChain();
+    };
   }, []);
 
   return (
@@ -194,25 +261,31 @@ export function AdminDashboard() {
 
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold text-gray-900">Fitting Distribution</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Live Activity Timeline</h3>
           </CardHeader>
           <CardContent>
-            {fittingTypesData.length > 0 ? (
-              <>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={fittingTypesData} cx="50%" cy="50%" outerRadius={80} dataKey="value">
-                      {fittingTypesData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </>
-            ) : (
-              <div className="text-center py-8 text-gray-500">No data</div>
-            )}
+            <div className="space-y-3 max-h-80 overflow-auto pr-1">
+              {isRealtimeLoading ? (
+                [...Array(5)].map((_, i) => (
+                  <div key={i} className="animate-pulse p-3 rounded-lg border border-gray-200 bg-gray-50" />
+                ))
+              ) : liveEvents.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">No live activity yet</div>
+              ) : (
+                liveEvents.map((ev) => (
+                  <div key={ev.id} className="p-3 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium text-gray-900">{ev.title}</div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${ev.status === 'confirmed' ? 'bg-green-50 text-green-700' : ev.status === 'pending' ? 'bg-yellow-50 text-yellow-700' : ev.status === 'failed' ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-700'}`}>
+                        {ev.status}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-gray-600 truncate">{ev.subtitle}</div>
+                    <div className="mt-1 text-[11px] text-gray-500">{ev.createdAt.toLocaleString()}</div>
+                  </div>
+                ))
+              )}
+            </div>
           </CardContent>
         </Card>
 
