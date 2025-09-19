@@ -716,9 +716,9 @@ export function BlockchainAudit() {
                     {/* Header Section - Always Visible */}
                     <div className="p-4">
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-3 gap-3">
-                        <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            {getEventTypeIcon(record.eventType)}
+                        {getEventTypeIcon(record.eventType)}
                           </div>
                           <div className="min-w-0 flex-1">
                             <h4 className="font-medium text-gray-900 truncate">{record.fittingId}</h4>
@@ -799,10 +799,10 @@ export function BlockchainAudit() {
                                    onClick={() => navigator.clipboard.writeText(record.fittingId)}
                                    title="Click to copy">
                                   {record.fittingId}
-                                </p>
-                              </div>
-                            </div>
-                            
+                      </p>
+                    </div>
+                  </div>
+                  
                             {record.transactionHash && (
                               <div className="space-y-2">
                                 <div className="flex items-center gap-2">
@@ -816,10 +816,10 @@ export function BlockchainAudit() {
                                     <ExternalLink className="h-3 w-3 flex-shrink-0" />
                                   </a>
                                 </div>
-                              </div>
+                    </div>
                             )}
                             
-                            {record.blockNumber && (
+                    {record.blockNumber && (
                               <div className="space-y-2">
                                 <div className="flex items-center gap-2">
                                   <Package className="h-4 w-4 text-gray-500" />
@@ -830,8 +830,8 @@ export function BlockchainAudit() {
                                     #{record.blockNumber.toLocaleString()}
                                   </p>
                                 </div>
-                              </div>
-                            )}
+                      </div>
+                    )}
                           </div>
 
                           {/* Additional Info Row */}
@@ -854,7 +854,7 @@ export function BlockchainAudit() {
                               <p className="text-sm text-gray-800">{record.timestamp.toLocaleString()}</p>
                             </div>
                             
-                            {record.gasUsed && (
+                    {record.gasUsed && (
                               <div className="space-y-2">
                                 <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Gas Used</span>
                                 <p className="text-sm font-mono text-gray-800">{record.gasUsed.toLocaleString()}</p>

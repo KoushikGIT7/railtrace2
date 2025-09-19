@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   LayoutDashboard, 
   QrCode, 
@@ -12,7 +12,7 @@ import {
   TrendingUp,
   Menu,
   X,
-  TestTube
+  
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -28,7 +28,6 @@ const roleMenuItems = {
     { id: 'analytics', label: 'AI Analytics', icon: TrendingUp },
     { id: 'blockchain', label: 'Blockchain Audit', icon: Shield },
     { id: 'reports', label: 'Reports', icon: BarChart3 },
-    { id: 'test-accounts', label: 'Test Accounts', icon: TestTube },
     { id: 'settings', label: 'Settings', icon: Settings }
   ],
   vendor: [
@@ -108,7 +107,10 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
                 className="w-full h-full object-contain filter brightness-0 invert"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
-                  e.currentTarget.nextElementSibling!.style.display = 'block';
+                  const sibling = e.currentTarget.nextElementSibling as HTMLElement | null;
+                  if (sibling) {
+                    sibling.style.display = 'block';
+                  }
                 }}
               />
               <div className="hidden text-white font-bold text-xs text-center">

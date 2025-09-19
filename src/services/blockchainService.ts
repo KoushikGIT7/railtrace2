@@ -265,7 +265,7 @@ class BlockchainService {
 			try { data = JSON.parse(e.metadata || '{}'); } catch {}
 			// Attach next available saved tx for this event type
 			const match = queues[eventType]?.shift();
-			return {
+      return {
 				eventType,
 				partHash,
 				timestamp: Number(e.timestamp),
@@ -284,7 +284,7 @@ class BlockchainService {
 						if (receipt) {
 							event.blockNumber = receipt.blockNumber || 0;
 						}
-					} catch (error) {
+    } catch (error) {
 						console.warn('Failed to fetch block number for tx:', event.transactionHash, error);
 					}
 				}

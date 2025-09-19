@@ -645,9 +645,9 @@ Last Updated: ${lastUpdate.toLocaleString()}
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Reports & Analytics</h2>
-          <p className="text-gray-600 mt-1">Generate and download comprehensive reports</p>
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Reports & Analytics</h2>
+        <p className="text-gray-600 mt-1">Generate and download comprehensive reports</p>
           <p className="text-sm text-gray-500 mt-1">
             Last updated: {lastUpdate.toLocaleTimeString()} | 
             Real-time data: {realTimeData.totalTransactions} transactions
@@ -809,17 +809,17 @@ Last Updated: ${lastUpdate.toLocaleString()}
                 <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full" />
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={250}>
+            <ResponsiveContainer width="100%" height={250}>
                 <AreaChart data={monthlyData.length > 0 ? monthlyData : inspectionData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
                   <Area type="monotone" dataKey="passed" stackId="1" stroke="#10B981" fill="#10B981" fillOpacity={0.6} name="Passed" />
                   <Area type="monotone" dataKey="failed" stackId="2" stroke="#EF4444" fill="#EF4444" fillOpacity={0.6} name="Failed" />
                   <Area type="monotone" dataKey="pending" stackId="3" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.6} name="Pending" />
-                </AreaChart>
-              </ResponsiveContainer>
+              </AreaChart>
+            </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
@@ -976,7 +976,7 @@ Last Updated: ${lastUpdate.toLocaleString()}
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Generated Reports</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Generated Reports</h3>
               <p className="text-sm text-gray-500 mt-1">Download individual reports or export all data</p>
             </div>
             <div className="flex items-center gap-2">
@@ -1018,14 +1018,14 @@ Last Updated: ${lastUpdate.toLocaleString()}
                     {getStatusBadge(report.status)}
                     {report.status === 'ready' && (
                       <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => downloadReport(report)}
-                          leftIcon={<Download className="h-4 w-4" />}
-                        >
-                          Download
-                        </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadReport(report)}
+                        leftIcon={<Download className="h-4 w-4" />}
+                      >
+                        Download
+                      </Button>
                         <div className="text-xs text-gray-500">
                           {report.type === 'summary' ? 'TXT' : report.type === 'detailed' ? 'JSON' : 'CSV'}
                         </div>
