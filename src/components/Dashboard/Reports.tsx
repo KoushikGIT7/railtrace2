@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { TruncatedText } from '../ui/TruncatedText';
+import { ReportCard } from '../ui/ReportCard';
 import { StatsCard } from './StatsCard';
 import { 
   XAxis, 
@@ -226,18 +227,18 @@ export function Reports() {
       );
       
       const snapshot = await getDocs(q);
-      const transactions = snapshot.docs.map(doc => {
-        const data = doc.data();
+      const transactions: any[] = snapshot.docs.map(doc => {
+        const data: any = doc.data();
         return {
           ...data,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
-        };
+          createdAt: data?.createdAt?.toDate ? data.createdAt.toDate() : new Date(data?.createdAt)
+        } as any;
       });
 
       // Group by month
       const monthlyGroups: { [key: string]: any } = {};
       
-      transactions.forEach(transaction => {
+      transactions.forEach((transaction: any) => {
         const month = transaction.createdAt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
         if (!monthlyGroups[month]) {
           monthlyGroups[month] = {
@@ -251,10 +252,10 @@ export function Reports() {
           };
         }
         
-        switch (transaction.eventType) {
+        switch ((transaction as any).eventType) {
           case 'inspected':
-            if (transaction.data?.resultCode === 0) monthlyGroups[month].passed++;
-            else if (transaction.data?.resultCode === 1) monthlyGroups[month].failed++;
+            if ((transaction as any).data?.resultCode === 0) monthlyGroups[month].passed++;
+            else if ((transaction as any).data?.resultCode === 1) monthlyGroups[month].failed++;
             else monthlyGroups[month].pending++;
             break;
           case 'registered':
@@ -543,7 +544,7 @@ Last Updated: ${lastUpdate.toLocaleString()}
     return JSON.stringify(reportData, null, 2);
   };
 
-  const generateAnalyticsReport = (report: ReportData): string => {
+  const generateAnalyticsReport = (_report: ReportData): string => {
     const headers = [
       'Metric',
       'Value',
@@ -649,18 +650,7 @@ Last Updated: ${lastUpdate.toLocaleString()}
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ready':
-        return <Badge variant="success" size="sm">Ready</Badge>;
-      case 'generating':
-        return <Badge variant="warning" size="sm">Generating</Badge>;
-      case 'failed':
-        return <Badge variant="error" size="sm">Failed</Badge>;
-      default:
-        return <Badge variant="default" size="sm">{status}</Badge>;
-    }
-  };
+  // kept for legacy references; not used in the new ReportCard layout
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -819,31 +809,25 @@ Last Updated: ${lastUpdate.toLocaleString()}
         />
       </div>
 
-      {/* Report Generation */}
+      {/* Report Generation - mobile-first clean layout */}
       <Card>
         <CardHeader>
           <h3 className="text-lg font-semibold text-gray-900">Generate New Report</h3>
+          <p className="text-sm text-gray-500">Optimized for mobile: stacked inputs and large tap targets.</p>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
+            <div className="min-w-0">
               <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                defaultValue="summary"
-              >
+              <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" defaultValue="summary">
                 <option value="summary">Summary Report</option>
                 <option value="detailed">Detailed Report</option>
                 <option value="analytics">Analytics Report</option>
               </select>
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
+              <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <option value="all">All Categories</option>
                 <option value="inspections">Inspections</option>
                 <option value="vendors">Vendors</option>
@@ -851,43 +835,19 @@ Last Updated: ${lastUpdate.toLocaleString()}
                 <option value="quality">Quality Control</option>
               </select>
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="block text-sm font-medium text-gray-700 mb-2">Time Period</label>
-              <select
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
+              <select value={selectedPeriod} onChange={(e) => setSelectedPeriod(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
                 <option value="90d">Last 90 days</option>
               </select>
             </div>
           </div>
-          <div className="mt-4 flex flex-col sm:flex-row gap-3">
-            <Button
-              onClick={() => generateReport('summary', selectedCategory)}
-              loading={isGenerating}
-              leftIcon={<FileText className="h-4 w-4" />}
-            >
-              Generate Summary Report
-            </Button>
-            <Button
-              onClick={() => generateReport('detailed', selectedCategory)}
-              loading={isGenerating}
-              leftIcon={<BarChart3 className="h-4 w-4" />}
-              variant="outline"
-            >
-              Generate Detailed Report
-            </Button>
-            <Button
-              onClick={() => generateReport('analytics', selectedCategory)}
-              loading={isGenerating}
-              leftIcon={<TrendingUp className="h-4 w-4" />}
-              variant="outline"
-            >
-              Generate Analytics Report
-            </Button>
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Button onClick={() => generateReport('summary', selectedCategory)} loading={isGenerating} leftIcon={<FileText className="h-4 w-4" />}>Summary</Button>
+            <Button onClick={() => generateReport('detailed', selectedCategory)} loading={isGenerating} leftIcon={<BarChart3 className="h-4 w-4" />} variant="outline">Detailed</Button>
+            <Button onClick={() => generateReport('analytics', selectedCategory)} loading={isGenerating} leftIcon={<TrendingUp className="h-4 w-4" />} variant="outline">Analytics</Button>
           </div>
         </CardContent>
       </Card>
@@ -1067,7 +1027,7 @@ Last Updated: ${lastUpdate.toLocaleString()}
         </CardContent>
       </Card>
 
-      {/* Report List - Mobile optimized with clear Download placement */}
+      {/* Report List - Mobile optimized using ReportCard */}
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1092,40 +1052,18 @@ Last Updated: ${lastUpdate.toLocaleString()}
         </CardHeader>
         <CardContent>
           {filteredReports.length > 0 ? (
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredReports.map((report) => (
-                <div key={report.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        {getTypeIcon(report.type)}
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-gray-900">{report.title}</h4>
-                        <div className="flex flex-wrap items-center gap-x-2 text-sm text-gray-600">
-                          <span className="capitalize">{report.category}</span>
-                          <span>•</span>
-                          <span>{report.period}</span>
-                          <span>•</span>
-                          <span>{report.generatedAt.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                      {getStatusBadge(report.status)}
-                      {report.status === 'ready' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => downloadReport(report)}
-                          leftIcon={<Download className="h-4 w-4" />}
-                        >
-                          Download {report.type === 'summary' ? 'TXT' : report.type === 'detailed' ? 'JSON' : 'CSV'}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <ReportCard
+                  key={report.id}
+                  title={report.title}
+                  category={report.category}
+                  period={report.period}
+                  generatedAt={report.generatedAt}
+                  status={report.status}
+                  onDownload={report.status === 'ready' ? () => downloadReport(report) : undefined}
+                  icon={getTypeIcon(report.type)}
+                />
               ))}
             </div>
           ) : (
