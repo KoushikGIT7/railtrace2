@@ -203,15 +203,6 @@ inspectPart(partHash, inspectorId, resultCode, mediaHash) → AI health score
 - [ ] Set up monitoring and logging
 - [ ] Test all role-based workflows
 
-### Environment Variables
-```env
-VITE_FIREBASE_API_KEY=your_firebase_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_GEMINI_API_KEY=your_gemini_api_key
-VITE_BLOCKCHAIN_RPC_URL=your_ethereum_rpc_url
-VITE_RELAYER_ENDPOINT=your_relayer_service_url
-```
 
 ## 🤝 Contributing
 
