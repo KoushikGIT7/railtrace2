@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { CopyButton } from '../ui/CopyButton';
+import { TruncatedText } from '../ui/TruncatedText';
 import { StatsCard } from './StatsCard';
 import { Skeleton } from '../ui/Skeleton';
 import { blockchainService } from '../../services/blockchainService';
@@ -735,9 +736,7 @@ export function BlockchainAudit() {
                         <div className="flex items-center gap-2 min-w-0">
                           <Hash className="h-4 w-4 text-gray-500" />
                           <span className="text-xs text-gray-600">Part Hash:</span>
-                          <span className="font-mono text-xs text-gray-800 truncate" title={record.fittingId}>
-                            {record.fittingId}
-                          </span>
+                          <TruncatedText text={record.fittingId} className="text-xs text-gray-800" />
                           <CopyButton value={record.fittingId} size="sm" />
                         </div>
                         
@@ -745,14 +744,8 @@ export function BlockchainAudit() {
                           <div className="flex items-center gap-2 min-w-0">
                             <Shield className="h-4 w-4 text-gray-500" />
                             <span className="text-xs text-gray-600">Tx Hash:</span>
-                            <a 
-                              className="text-blue-600 hover:text-blue-800 font-mono text-xs truncate" 
-                              href={bscscanTx(record.transactionHash)} 
-                              target="_blank" 
-                              rel="noreferrer"
-                              title={record.transactionHash}
-                            >
-                              {record.transactionHash}
+                            <a className="text-blue-600 hover:text-blue-800 font-mono text-xs truncate" href={bscscanTx(record.transactionHash)} target="_blank" rel="noreferrer" title={record.transactionHash}>
+                              <TruncatedText text={record.transactionHash} className="text-xs" />
                             </a>
                             <CopyButton value={record.transactionHash} size="sm" />
                           </div>

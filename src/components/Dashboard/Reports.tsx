@@ -13,6 +13,7 @@ import {
 import { Card, CardContent, CardHeader } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { TruncatedText } from '../ui/TruncatedText';
 import { StatsCard } from './StatsCard';
 import { 
   XAxis, 
@@ -765,19 +766,13 @@ Last Updated: ${lastUpdate.toLocaleString()}
                     </div>
                   </div>
                   <div className="mt-3">
-                    <KeyValueRow label="Part Hash" value={<span className="font-mono">{tx.partHash || tx.fittingId || '-'}</span>} />
+                    <KeyValueRow label="Part Hash" value={<TruncatedText text={tx.partHash || tx.fittingId || '-'} />} />
                     {tx.transactionHash && (
                       <KeyValueRow
                         label="Tx Hash"
                         value={
-                          <a
-                            href={`https://testnet.bscscan.com/tx/${tx.transactionHash}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-mono text-blue-700 hover:text-blue-900 break-all"
-                            title={tx.transactionHash}
-                          >
-                            {tx.transactionHash}
+                          <a href={`https://testnet.bscscan.com/tx/${tx.transactionHash}`} target="_blank" rel="noreferrer" className="text-blue-700 hover:text-blue-900" title={tx.transactionHash}>
+                            <TruncatedText text={tx.transactionHash} />
                           </a>
                         }
                       />
