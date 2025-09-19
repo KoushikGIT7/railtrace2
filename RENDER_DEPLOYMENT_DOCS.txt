@@ -1,0 +1,322 @@
+================================================================================
+                    RENDER DEPLOYMENT DOCUMENTATION
+                    Node.js Relayer Server Hosting
+================================================================================
+
+OVERVIEW
+--------
+This document provides step-by-step instructions for deploying the RailTrace 
+relayer server (Node.js + Express) to Render's free hosting platform.
+
+================================================================================
+1. PROJECT FOLDER STRUCTURE
+================================================================================
+
+Required structure for Render deployment:
+```
+railtrace-relayer/
+├── relayer/
+│   └── index.cjs
+├── package.json
+├── render.yaml
+└── .env.example
+```
+
+================================================================================
+2. PREPARING GITHUB REPOSITORY
+================================================================================
+
+2.1 Create New Repository
+-------------------------
+1. Create new GitHub repository: "railtrace-relayer"
+2. Initialize with README.md
+3. Clone repository locally
+
+2.2 Copy Relayer Files
+---------------------
+Copy these files to the new repository:
+- relayer/index.cjs (from main project)
+- package.json (modified for deployment)
+- render.yaml (new deployment config)
+
+2.3 Commit and Push
+-------------------
+```bash
+git add .
+git commit -m "Initial relayer server setup"
+git push origin main
+```
+
+================================================================================
+3. PACKAGE.JSON CONFIGURATION
+================================================================================
+
+Create package.json in repository root:
+
+```json
+{
+  "name": "railtrace-relayer",
+  "version": "1.0.0",
+  "description": "RailTrace Blockchain Relayer Server",
+  "main": "relayer/index.cjs",
+  "scripts": {
+    "start": "node relayer/index.cjs",
+    "dev": "node relayer/index.cjs"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "ethers": "^6.15.0",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+```
+
+Key Points:
+- "start" script points to relayer/index.cjs
+- Includes all required dependencies
+- Specifies Node.js version requirement
+
+================================================================================
+4. RENDER.YAML CONFIGURATION
+================================================================================
+
+Create render.yaml in repository root:
+
+```yaml
+services:
+  - type: web
+    name: railtrace-relayer
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: BSC_TESTNET_RPC_URL
+        value: https://data-seed-prebsc-1-s1.binance.org:8545/
+      - key: CONTRACT_ADDRESS
+        value: 0x265c23BE0D06a5B07775A594F00E20d505eFBA2c
+      - key: PRIVATE_KEY
+        sync: false
+    healthCheckPath: /health
+```
+
+Key Points:
+- Uses free plan
+- Sets environment variables
+- PRIVATE_KEY marked as secret (sync: false)
+- Health check endpoint configured
+
+================================================================================
+5. DEPLOYING TO RENDER
+================================================================================
+
+5.1 Create Render Account
+-------------------------
+1. Go to https://render.com
+2. Sign up with GitHub account
+3. Connect GitHub repository
+
+5.2 Create New Web Service
+--------------------------
+1. Click "New +" button
+2. Select "Web Service"
+3. Connect GitHub repository: "railtrace-relayer"
+4. Configure service:
+   - Name: railtrace-relayer
+   - Environment: Node
+   - Region: Oregon (US West)
+   - Branch: main
+   - Root Directory: (leave empty)
+   - Build Command: npm install
+   - Start Command: npm start
+
+5.3 Set Environment Variables
+-----------------------------
+In Render dashboard, go to Environment tab:
+- BSC_TESTNET_RPC_URL: https://data-seed-prebsc-1-s1.binance.org:8545/
+- CONTRACT_ADDRESS: 0x265c23BE0D06a5B07775A594F00E20d505eFBA2c
+- PRIVATE_KEY: [Your BSC Testnet Private Key]
+
+5.4 Deploy
+----------
+1. Click "Create Web Service"
+2. Wait for build to complete (2-3 minutes)
+3. Service will be available at: https://railtrace-relayer.onrender.com
+
+================================================================================
+6. TESTING DEPLOYED ENDPOINT
+================================================================================
+
+6.1 Health Check
+----------------
+```bash
+curl https://railtrace-relayer.onrender.com/health
+```
+Expected Response:
+```json
+{"ok":true}
+```
+
+6.2 Test Relayer Endpoint
+-------------------------
+```bash
+curl -X POST https://railtrace-relayer.onrender.com/relayer \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "registerPart",
+    "params": {
+      "partHash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "metadata": "{\"vendorId\":\"TEST\",\"lotId\":\"BATCH-001\"}"
+    }
+  }'
+```
+
+Expected Response:
+```json
+{
+  "transactionHash": "0x..."
+}
+```
+
+6.3 Verify on BscScan
+---------------------
+1. Copy transaction hash from response
+2. Go to https://testnet.bscscan.com/
+3. Search for transaction hash
+4. Verify transaction details
+
+================================================================================
+7. UPDATING FRONTEND CONFIGURATION
+================================================================================
+
+7.1 Update Frontend .env
+------------------------
+In your main project's .env file, update:
+```
+VITE_RELAYER_ENDPOINT=https://railtrace-relayer.onrender.com/relayer
+```
+
+7.2 Update Netlify Environment Variables
+----------------------------------------
+In Netlify dashboard:
+1. Go to Site Settings > Environment Variables
+2. Add/Update: VITE_RELAYER_ENDPOINT
+3. Value: https://railtrace-relayer.onrender.com/relayer
+4. Redeploy frontend
+
+7.3 Test Full Integration
+------------------------
+1. Deploy updated frontend to Netlify
+2. Test part registration from frontend
+3. Verify transaction appears on BscScan
+4. Check real-time updates in UI
+
+================================================================================
+8. TROUBLESHOOTING
+================================================================================
+
+8.1 Common Issues
+-----------------
+- Build fails: Check package.json dependencies
+- Service won't start: Verify start command in render.yaml
+- 500 errors: Check environment variables are set
+- CORS errors: Verify CORS is enabled in relayer code
+
+8.2 Debugging Steps
+-------------------
+1. Check Render logs in dashboard
+2. Verify all environment variables are set
+3. Test health endpoint first
+4. Check BSC Testnet RPC connectivity
+5. Verify private key format
+
+8.3 Render Free Plan Limitations
+-------------------------------
+- Service sleeps after 15 minutes of inactivity
+- Cold start takes 30-60 seconds
+- 750 hours per month limit
+- Consider upgrading for production use
+
+================================================================================
+9. MONITORING AND MAINTENANCE
+================================================================================
+
+9.1 Health Monitoring
+---------------------
+- Set up uptime monitoring for /health endpoint
+- Monitor Render dashboard for service status
+- Check logs regularly for errors
+
+9.2 Updates and Deployments
+---------------------------
+- Push changes to GitHub main branch
+- Render auto-deploys on push
+- Monitor deployment logs for issues
+- Test endpoints after each deployment
+
+9.3 Scaling Considerations
+--------------------------
+- Free plan suitable for development/testing
+- Upgrade to paid plan for production
+- Consider load balancing for high traffic
+- Monitor resource usage
+
+================================================================================
+10. SECURITY CONSIDERATIONS
+================================================================================
+
+10.1 Environment Variables
+--------------------------
+- Never commit private keys to repository
+- Use Render's secret environment variables
+- Rotate private keys regularly
+- Monitor access logs
+
+10.2 API Security
+-----------------
+- Consider adding API key authentication
+- Implement rate limiting
+- Add request validation
+- Monitor for suspicious activity
+
+================================================================================
+11. COST OPTIMIZATION
+================================================================================
+
+11.1 Free Plan Usage
+--------------------
+- Monitor monthly usage hours
+- Optimize cold start times
+- Use health checks to keep service warm
+- Consider scheduled pings
+
+11.2 Upgrade Planning
+---------------------
+- Monitor service performance
+- Track usage patterns
+- Plan upgrade when needed
+- Consider alternative hosting options
+
+================================================================================
+12. FINAL CHECKLIST
+================================================================================
+
+Before going live:
+□ Repository created and pushed to GitHub
+□ package.json configured correctly
+□ render.yaml created with proper settings
+□ Environment variables set in Render
+□ Service deployed and health check passes
+□ Relayer endpoint tested with curl
+□ Frontend .env updated with new endpoint
+□ Full integration tested end-to-end
+□ BscScan verification working
+□ Monitoring setup complete
+
+================================================================================
+END OF DEPLOYMENT DOCUMENTATION
+================================================================================

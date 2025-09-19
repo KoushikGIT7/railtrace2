@@ -1,0 +1,108 @@
+RailTrace Blockchain Mock & Relayer Architecture
+
+Overview
+- Library: ethers (hashing, contract interface)
+- Service: src/services/blockchainService.ts (singleton export: blockchainService)
+- Modes: Demo/mock by default; real network if a valid RPC is configured and reachable
+
+Key Environment Variables
+- VITE_BLOCKCHAIN_RPC_URL: Ethereum RPC URL (default: http://localhost:8545)
+- VITE_CONTRACT_ADDRESS: Deployed contract address (default: zero address)
+- VITE_RELAYER_ENDPOINT: HTTP relayer endpoint (default: http://localhost:8787/relayer)
+
+Vite Dev Proxy Note
+- vite.config.ts proxies /api → http://localhost:8787
+- blockchainService calls the relayer at /relayer, so it bypasses the proxy unless configured
+
+Contract ABI (Simplified)
+- Events: Registered, Received, Installed, Inspected, Retired
+- Functions: registerPart, receivePart, installPart, inspectPart, retirePart, getPartHistory
+
+Initialization Flow
+1) Provider/Contract Setup
+   - Reads VITE_BLOCKCHAIN_RPC_URL (default http://localhost:8545)
+   - If URL includes localhost:8545 and isLocalBlockchainAvailable() is false → demo mode
+   - Otherwise constructs ethers.JsonRpcProvider and ethers.Contract, sets up on-chain event listeners
+
+2) Demo/Mock Mode Trigger
+   - isLocalBlockchainAvailable() returns false (hardcoded), so localhost RPC defaults to demo
+   - In demo mode, no provider/contract is attached
+
+Mock Data & Real-Time Simulation
+- Pre-populated mock events in memory (registered, received, installed, inspected) for a sample part
+- Real-time simulation timer (30s) creates a new random event of type: registered | received | installed | inspected
+- New events are unshifted into an in-memory ring (max ~100), and subscribers are notified
+
+Event Subscription API
+- subscribeToEvents(callback):
+  - Immediately invokes the callback with the current mock events
+  - Stores the callback and pushes updates on each simulated event
+  - Returns an unsubscribe function
+
+UI Notification Bridge (Real Mode)
+- When a real provider/contract is active, on-chain events trigger handleBlockchainEvent
+- handleBlockchainEvent dispatches a window CustomEvent("blockchainEvent", { detail: event }) for UI listeners
+
+Read Path (History/Verification)
+- getPartHistory(partHash):
+  - Demo mode (no provider): filters and returns in-memory mock events matching partHash
+  - Real mode: calls contract.getPartHistory(partHash); on error, falls back to mock
+
+- verifyPart(partHash):
+  - Fetches history via getPartHistory
+  - If empty → { isValid: false, status: "invalid" }
+  - Otherwise checks for a registration marker; code expects on-chain tuple with a numeric status (0 = registered). In demo mode, mock events don’t have this numeric status, so UI should treat non-empty history as pending/verified heuristically.
+
+Write Path (Lifecycle Actions)
+- registerPart(partData): Computes deterministic keccak256 hash from partId-vendorId-lotId-manufactureDate
+- receivePart(receiptData)
+- installPart(installationData)
+- inspectPart(inspectionData): hashes joined media hashes → mediaHash
+- retirePart(partHash)
+
+All write methods:
+- Do not mutate the in-memory mock event store
+- Send a JSON payload to the relayer endpoint: { method, params }
+- Expect { transactionHash } in response
+- If the relayer is not running/reachable → throws "Failed to submit transaction to blockchain"
+
+Relayer Contract Pattern
+- Frontend never signs transactions or manages wallets
+- Relayer endpoint is responsible for creating, signing, and submitting the transaction on behalf of the user
+- Reads are direct (provider) when available; writes always go via relayer
+
+Hashes & Identity
+- generatePartHash(partData): keccak256(UTF-8("{partId}-{vendorId}-{lotId}-{manufactureDateMs}"))
+- Ensures deterministic identity across systems
+
+How Components Typically Use It
+- Subscribe to events for dashboards:
+  - const unsubscribe = blockchainService.subscribeToEvents(setEvents)
+- Fetch history when scanning/looking up a part:
+  - const history = await blockchainService.getPartHistory(partHash)
+- Verify authenticity:
+  - const { isValid, status } = await blockchainService.verifyPart(partHash)
+- Submit lifecycle updates (requires relayer):
+  - await blockchainService.registerPart(...), receivePart(...), installPart(...), inspectPart(...), retirePart(...)
+
+Running in Pure Demo Mode (No Blockchain/Relayer)
+- The app shows a live-updating mock event stream
+- Reads: history and verification work against in-memory data
+- Writes: will throw unless a relayer is running and reachable
+
+Running with Real Network + Relayer
+- Set env:
+  - VITE_BLOCKCHAIN_RPC_URL=https://<rpc>
+  - VITE_CONTRACT_ADDRESS=0x...
+  - VITE_RELAYER_ENDPOINT=https://<relayer>/relayer
+- Provider + contract initialize and attach on-chain listeners
+- Reads go on-chain; writes still use the relayer
+
+Caveats & Notes
+- Verification heuristic checks event.status === 0 (on-chain tuple). Mock events do not contain this numeric status; consumers may need to treat any non-empty mock history as pending/verified based on business rules.
+- The vite dev proxy only handles /api. Relayer default path is /relayer; configure proxy or set VITE_RELAYER_ENDPOINT accordingly if you want it proxied.
+- No wallet UX on the frontend by design.
+
+File Pointers (for maintainers)
+- Service: src/services/blockchainService.ts
+- Vite config: vite.config.ts (proxy)

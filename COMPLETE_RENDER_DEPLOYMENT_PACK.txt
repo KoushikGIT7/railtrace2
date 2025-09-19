@@ -1,0 +1,624 @@
+================================================================================
+                    RAILTRACE RELAYER - COMPLETE DEPLOYMENT PACK
+                    Node.js Blockchain Relayer Server for Render
+================================================================================
+
+OVERVIEW
+--------
+This is a complete deployment package for the RailTrace blockchain relayer server.
+The relayer acts as a backend service that handles blockchain transactions for the
+frontend hosted on Netlify, working alongside Firebase services.
+
+================================================================================
+1. PROJECT STRUCTURE
+================================================================================
+
+railtrace-relayer/
+├── relayer/
+│   └── index.cjs
+├── package.json
+├── render.yaml
+├── .env.example
+└── README.md
+
+================================================================================
+2. RELAYER SERVER CODE (relayer/index.cjs)
+================================================================================
+
+const express = require('express');
+const cors = require('cors');
+const { ethers } = require('ethers');
+require('dotenv').config();
+
+const app = express();
+
+// Middleware
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Environment variables
+const RPC_URL = process.env.BSC_TESTNET_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/';
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS || '0x265c23BE0D06a5B07775A594F00E20d505eFBA2c';
+
+// Smart contract ABI
+const RAILTRACE_ABI = [
+  "function registerPart(bytes32 partHash, string memory metadata) external",
+  "function receivePart(bytes32 partHash, string memory metadata) external", 
+  "function installPart(bytes32 partHash, string memory metadata) external",
+  "function inspectPart(bytes32 partHash, string memory metadata) external",
+  "function retirePart(bytes32 partHash, string memory metadata) external",
+  "function getPartHistory(bytes32 partHash) external view returns (tuple(uint8 status, uint256 timestamp, string metadata)[])"
+];
+
+// Initialize provider and wallet
+let provider, wallet, contract;
+
+function initializeBlockchain() {
+  try {
+    provider = new ethers.JsonRpcProvider(RPC_URL);
+    
+    if (!PRIVATE_KEY) {
+      console.error('PRIVATE_KEY is required but not provided');
+      return false;
+    }
+    
+    wallet = new ethers.Wallet(PRIVATE_KEY, provider);
+    contract = new ethers.Contract(CONTRACT_ADDRESS, RAILTRACE_ABI, wallet);
+    
+    console.log('Blockchain initialized successfully');
+    console.log('Contract address:', CONTRACT_ADDRESS);
+    console.log('Wallet address:', wallet.address);
+    
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize blockchain:', error);
+    return false;
+  }
+}
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ ok: true });
+});
+
+// Main relayer endpoint
+app.post('/relayer', async (req, res) => {
+  try {
+    const { method, params } = req.body;
+    
+    // Validate request
+    if (!method || !params) {
+      return res.status(400).json({ 
+        error: 'Invalid request format. Expected {method, params}' 
+      });
+    }
+    
+    // Check if blockchain is initialized
+    if (!contract) {
+      return res.status(500).json({ 
+        error: 'Blockchain not initialized. Check server configuration.' 
+      });
+    }
+    
+    // Validate method
+    const validMethods = ['registerPart', 'receivePart', 'installPart', 'inspectPart', 'retirePart'];
+    if (!validMethods.includes(method)) {
+      return res.status(400).json({ 
+        error: `Invalid method. Allowed methods: ${validMethods.join(', ')}` 
+      });
+    }
+    
+    // Validate params
+    if (!params.partHash || !params.metadata) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters: partHash, metadata' 
+      });
+    }
+    
+    // Validate partHash format (should be 66 characters starting with 0x)
+    if (!/^0x[a-fA-F0-9]{64}$/.test(params.partHash)) {
+      return res.status(400).json({ 
+        error: 'Invalid partHash format. Expected 0x followed by 64 hex characters' 
+      });
+    }
+    
+    // Validate metadata is JSON string
+    try {
+      JSON.parse(params.metadata);
+    } catch (e) {
+      return res.status(400).json({ 
+        error: 'Invalid metadata format. Expected valid JSON string' 
+      });
+    }
+    
+    console.log(`Processing ${method} for partHash: ${params.partHash}`);
+    
+    // Execute contract method
+    const tx = await contract[method](params.partHash, params.metadata);
+    console.log('Transaction sent:', tx.hash);
+    
+    // Wait for transaction confirmation
+    const receipt = await tx.wait();
+    console.log('Transaction confirmed in block:', receipt.blockNumber);
+    
+    // Return transaction hash
+    res.json({ 
+      transactionHash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      gasUsed: receipt.gasUsed.toString()
+    });
+    
+  } catch (error) {
+    console.error('Relayer error:', error);
+    
+    // Handle specific error types
+    if (error.code === 'INSUFFICIENT_FUNDS') {
+      return res.status(400).json({ 
+        error: 'Insufficient funds for gas fees' 
+      });
+    }
+    
+    if (error.code === 'UNPREDICTABLE_GAS_LIMIT') {
+      return res.status(400).json({ 
+        error: 'Transaction would fail. Check contract state and parameters' 
+      });
+    }
+    
+    if (error.message && error.message.includes('revert')) {
+      return res.status(400).json({ 
+        error: 'Transaction reverted: ' + error.message 
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message 
+    });
+  }
+});
+
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error('Unhandled error:', error);
+  res.status(500).json({ 
+    error: 'Internal server error' 
+  });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({ 
+    error: 'Endpoint not found' 
+  });
+});
+
+// Start server
+const PORT = process.env.PORT || 10000;
+
+// Initialize blockchain and start server
+if (initializeBlockchain()) {
+  app.listen(PORT, () => {
+    console.log(`RailTrace Relayer Server running on port ${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+    console.log(`Relayer endpoint: http://localhost:${PORT}/relayer`);
+  });
+} else {
+  console.error('Failed to start server due to blockchain initialization error');
+  process.exit(1);
+}
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  process.exit(0);
+});
+
+================================================================================
+3. PACKAGE.JSON
+================================================================================
+
+{
+  "name": "railtrace-relayer",
+  "version": "1.0.0",
+  "description": "RailTrace Blockchain Relayer Server for BSC Testnet",
+  "main": "relayer/index.cjs",
+  "scripts": {
+    "start": "node relayer/index.cjs",
+    "dev": "node relayer/index.cjs",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "ethers": "^6.15.0",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "blockchain",
+    "relayer",
+    "bsc",
+    "ethereum",
+    "railway",
+    "traceability"
+  ],
+  "author": "RailTrace Team",
+  "license": "MIT"
+}
+
+================================================================================
+4. RENDER.YAML
+================================================================================
+
+services:
+  - type: web
+    name: railtrace-relayer
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: BSC_TESTNET_RPC_URL
+        value: https://data-seed-prebsc-1-s1.binance.org:8545/
+      - key: CONTRACT_ADDRESS
+        value: 0x265c23BE0D06a5B07775A594F00E20d505eFBA2c
+      - key: PRIVATE_KEY
+        sync: false
+    autoDeploy: true
+
+================================================================================
+5. ENVIRONMENT VARIABLES (.env.example)
+================================================================================
+
+# Binance Smart Chain Testnet Configuration
+BSC_TESTNET_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545/
+CONTRACT_ADDRESS=0x265c23BE0D06a5B07775A594F00E20d505eFBA2c
+
+# Private Key (DO NOT COMMIT TO GIT)
+# Generate a new private key for BSC Testnet
+# Get test BNB from: https://testnet.bnbchain.org/faucet-smart
+PRIVATE_KEY=your_bsc_testnet_private_key_here
+
+# Server Configuration
+PORT=10000
+NODE_ENV=production
+
+================================================================================
+6. README.MD
+================================================================================
+
+# RailTrace Relayer Server
+
+A blockchain relayer server for the RailTrace railway parts tracking system.
+
+## Features
+
+- Handles blockchain transactions for BSC Testnet
+- Express.js API with CORS support
+- Health check endpoint
+- Error handling and validation
+- Environment-based configuration
+
+## Endpoints
+
+- `GET /health` - Health check
+- `POST /relayer` - Process blockchain transactions
+
+## Deployment
+
+This server is designed to be deployed on Render.com as a web service.
+
+## Environment Variables
+
+See `.env.example` for required environment variables.
+
+================================================================================
+7. GITHUB REPOSITORY SETUP
+================================================================================
+
+7.1 Create Repository
+---------------------
+1. Go to GitHub.com and create new repository
+2. Repository name: `railtrace-relayer`
+3. Description: "RailTrace Blockchain Relayer Server"
+4. Set to Public
+5. Initialize with README.md
+6. Click "Create repository"
+
+7.2 Clone and Setup
+-------------------
+```bash
+# Clone the repository
+git clone https://github.com/YOUR_USERNAME/railtrace-relayer.git
+cd railtrace-relayer
+
+# Create project structure
+mkdir relayer
+
+# Copy all files from this deployment pack
+# - relayer/index.cjs
+# - package.json  
+# - render.yaml
+# - .env.example
+# - README.md
+
+# Commit and push
+git add .
+git commit -m "Initial relayer server setup"
+git push origin main
+```
+
+================================================================================
+8. RENDER DEPLOYMENT STEPS
+================================================================================
+
+8.1 Create Render Account
+-------------------------
+1. Go to https://render.com
+2. Sign up with GitHub account
+3. Authorize Render to access your repositories
+
+8.2 Deploy Web Service
+----------------------
+1. Click "New +" button
+2. Select "Web Service"
+3. Connect GitHub repository: `railtrace-relayer`
+4. Configure service:
+   - Name: `railtrace-relayer`
+   - Environment: `Node`
+   - Region: `Oregon (US West)`
+   - Branch: `main`
+   - Root Directory: (leave empty)
+   - Build Command: `npm install`
+   - Start Command: `npm start`
+
+8.3 Set Environment Variables
+-----------------------------
+In Render dashboard, go to Environment tab:
+- `BSC_TESTNET_RPC_URL`: `https://data-seed-prebsc-1-s1.binance.org:8545/`
+- `CONTRACT_ADDRESS`: `0x265c23BE0D06a5B07775A594F00E20d505eFBA2c`
+- `PRIVATE_KEY`: `[Your BSC Testnet Private Key]`
+
+8.4 Deploy
+----------
+1. Click "Create Web Service"
+2. Wait for build to complete (2-3 minutes)
+3. Service will be available at: `https://railtrace-relayer.onrender.com`
+
+================================================================================
+9. TESTING DEPLOYED RELAYER
+================================================================================
+
+9.1 Health Check
+----------------
+```bash
+curl https://railtrace-relayer.onrender.com/health
+```
+Expected Response:
+```json
+{"ok":true}
+```
+
+9.2 Test Relayer Endpoint
+-------------------------
+```bash
+curl -X POST https://railtrace-relayer.onrender.com/relayer \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "registerPart",
+    "params": {
+      "partHash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "metadata": "{\"vendorId\":\"TEST-VENDOR\",\"lotId\":\"BATCH-001\",\"manufactureDate\":\"2024-01-01\"}"
+    }
+  }'
+```
+
+Expected Response:
+```json
+{
+  "transactionHash": "0x...",
+  "blockNumber": 12345678,
+  "gasUsed": "123456"
+}
+```
+
+9.3 Verify on BscScan
+---------------------
+1. Copy transaction hash from response
+2. Go to https://testnet.bscscan.com/
+3. Search for transaction hash
+4. Verify transaction details and contract interaction
+
+================================================================================
+10. NETLIFY FRONTEND INTEGRATION
+================================================================================
+
+10.1 Update Frontend Environment Variables
+------------------------------------------
+In your main project's `.env` file, add:
+```
+VITE_RELAYER_ENDPOINT=https://railtrace-relayer.onrender.com/relayer
+```
+
+10.2 Update Netlify Environment Variables
+-----------------------------------------
+In Netlify dashboard:
+1. Go to Site Settings > Environment Variables
+2. Add new variable:
+   - Key: `VITE_RELAYER_ENDPOINT`
+   - Value: `https://railtrace-relayer.onrender.com/relayer`
+3. Save changes
+
+10.3 Redeploy Frontend
+---------------------
+1. Trigger new deployment on Netlify
+2. Wait for deployment to complete
+3. Test frontend functionality
+
+10.4 Test Full Integration
+-------------------------
+1. Open your Netlify-hosted frontend
+2. Login as any role (admin, vendor, etc.)
+3. Try to register a new part
+4. Verify:
+   - Frontend calls relayer endpoint
+   - Transaction is sent to BSC Testnet
+   - Transaction hash is returned
+   - UI updates with transaction details
+   - Data is saved to Firebase
+   - Blockchain audit shows the transaction
+
+================================================================================
+11. ARCHITECTURE OVERVIEW
+================================================================================
+
+Frontend (Netlify) → Firebase (Auth/DB) + Relayer (Render) → BSC Testnet
+
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Frontend      │    │   Firebase      │    │   BSC Testnet   │
+│   (Netlify)     │    │   (Auth/DB)     │    │   (Blockchain)  │
+│                 │    │                 │    │                 │
+│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │
+│ │ React App   │ │    │ │ Auth        │ │    │ │ RailTrace   │ │
+│ │ Components  │ │    │ │ Firestore   │ │    │ │ Contract    │ │
+│ │ Services    │ │    │ │ Storage     │ │    │ │             │ │
+│ └─────────────┘ │    │ └─────────────┘ │    │ └─────────────┘ │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         │                       │                       │
+         │              ┌─────────────────┐              │
+         │              │   Relayer       │              │
+         └──────────────│   (Render)      │──────────────┘
+                        │                 │
+                        │ ┌─────────────┐ │
+                        │ │ Express API │ │
+                        │ │ ethers.js   │ │
+                        │ │ Signing     │ │
+                        │ └─────────────┘ │
+                        └─────────────────┘
+
+Data Flow:
+1. User action in frontend
+2. Frontend calls Firebase for auth/data
+3. Frontend calls relayer for blockchain operations
+4. Relayer signs and sends transaction to BSC Testnet
+5. Transaction is mined and confirmed
+6. Relayer returns transaction hash to frontend
+7. Frontend updates UI and saves to Firebase
+8. Real-time updates across all services
+
+================================================================================
+12. TROUBLESHOOTING
+================================================================================
+
+12.1 Common Issues
+------------------
+- Build fails: Check package.json dependencies
+- Service won't start: Verify start command and environment variables
+- 500 errors: Check PRIVATE_KEY is set correctly
+- CORS errors: Verify CORS is enabled in relayer code
+- Transaction fails: Check BSC Testnet RPC connectivity and gas fees
+
+12.2 Debugging Steps
+--------------------
+1. Check Render logs in dashboard
+2. Verify all environment variables are set
+3. Test health endpoint first
+4. Check BSC Testnet RPC connectivity
+5. Verify private key format and balance
+6. Test with BscScan to verify transactions
+
+12.3 Render Free Plan Limitations
+---------------------------------
+- Service sleeps after 15 minutes of inactivity
+- Cold start takes 30-60 seconds
+- 750 hours per month limit
+- Consider upgrading for production use
+
+================================================================================
+13. SECURITY CONSIDERATIONS
+================================================================================
+
+13.1 Environment Variables
+--------------------------
+- Never commit private keys to repository
+- Use Render's secret environment variables
+- Rotate private keys regularly
+- Monitor access logs
+
+13.2 API Security
+-----------------
+- CORS is configured for all origins (adjust for production)
+- Input validation on all endpoints
+- Error handling without exposing sensitive data
+- Rate limiting could be added for production
+
+================================================================================
+14. MONITORING AND MAINTENANCE
+================================================================================
+
+14.1 Health Monitoring
+---------------------
+- Set up uptime monitoring for /health endpoint
+- Monitor Render dashboard for service status
+- Check logs regularly for errors
+
+14.2 Updates and Deployments
+---------------------------
+- Push changes to GitHub main branch
+- Render auto-deploys on push
+- Monitor deployment logs for issues
+- Test endpoints after each deployment
+
+================================================================================
+15. FINAL CHECKLIST
+================================================================================
+
+Before going live:
+□ GitHub repository created and pushed
+□ All files copied correctly
+□ package.json configured with correct dependencies
+□ render.yaml created with proper settings
+□ Environment variables set in Render
+□ PRIVATE_KEY added as secret variable
+□ Service deployed and health check passes
+□ Relayer endpoint tested with curl
+□ BscScan verification working
+□ Frontend .env updated with new endpoint
+□ Netlify environment variables updated
+□ Frontend redeployed on Netlify
+□ Full integration tested end-to-end
+□ All user roles can perform blockchain operations
+□ Real-time updates working correctly
+
+================================================================================
+16. SUPPORT AND MAINTENANCE
+================================================================================
+
+For issues or questions:
+1. Check Render logs first
+2. Verify environment variables
+3. Test individual components
+4. Check BSC Testnet status
+5. Verify contract address and ABI
+
+The relayer server is now ready for production use with your Netlify frontend!
+
+================================================================================
+END OF DEPLOYMENT PACK
+================================================================================

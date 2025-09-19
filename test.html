@@ -1,0 +1,104 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Relayer Test</title>
+	<style>
+		body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; }
+		input, textarea, button { font: inherit; }
+		label { display:block; margin: 8px 0 4px; }
+		input, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
+		button { padding: 10px 14px; border: 1px solid #2563eb; background:#2563eb; color:#fff; border-radius:6px; cursor:pointer; }
+		#status { margin-top: 12px; color:#4b5563; }
+		#txHash { margin-top: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; color:#111827; }
+		#error { margin-top: 12px; color:#b91c1c; white-space: pre-wrap; }
+	</style>
+</head>
+<body>
+	<h1>BSC Testnet Relayer - Inspection Test</h1>
+	<p>Calls the relayer to submit an inspection. Displays tx hash on success or error reason on failure.</p>
+
+	<label for="relayer">Relayer URL</label>
+	<input id="relayer" value="http://localhost:8787/relayer" />
+
+	<label for="partHash">partHash (0x...)</label>
+	<input id="partHash" placeholder="0x..." />
+
+	<label for="inspectorId">inspectorId</label>
+	<input id="inspectorId" value="INSP-TEST" />
+
+	<label for="resultCode">resultCode (0=Pass,1=Fail,2=Defective)</label>
+	<input id="resultCode" value="0" />
+
+	<label for="notes">notes</label>
+	<textarea id="notes">OK</textarea>
+
+	<button id="submit">Submit Inspect</button>
+
+	<div id="status"></div>
+	<div id="txHash"></div>
+	<div id="error"></div>
+
+	<script>
+	function setText(id, text) { document.getElementById(id).textContent = text || ''; }
+	function setHTML(id, html) { document.getElementById(id).innerHTML = html || ''; }
+
+	document.getElementById('submit').addEventListener('click', async () => {
+		setText('status', 'Sending transaction...');
+		setText('txHash', '');
+		setText('error', '');
+
+		const relayer = document.getElementById('relayer').value.trim();
+		const partHash = document.getElementById('partHash').value.trim();
+		const inspectorId = document.getElementById('inspectorId').value.trim();
+		const resultCode = parseInt(document.getElementById('resultCode').value.trim(), 10) || 0;
+		const notes = document.getElementById('notes').value.trim();
+
+		if (!relayer || !partHash) {
+			setText('error', 'Missing relayer URL or partHash');
+			return;
+		}
+
+		const payload = {
+			method: 'inspectPart',
+			params: {
+				partHash,
+				metadata: JSON.stringify({ inspectorId, resultCode, notes })
+			}
+		};
+
+		try {
+			const controller = new AbortController();
+			const timeout = setTimeout(() => controller.abort(), 20000); // 20s timeout
+			const res = await fetch(relayer, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload),
+				signal: controller.signal,
+				cache: 'no-store'
+			});
+			clearTimeout(timeout);
+
+			if (!res.ok) {
+				let message = `HTTP ${res.status}`;
+				try { const j = await res.json(); if (j && j.error) message += ` - ${j.error}`; } catch {}
+				throw new Error(message);
+			}
+
+			const data = await res.json();
+			if (!data || !data.transactionHash) {
+				throw new Error('No transactionHash in response');
+			}
+
+			setText('status', 'Success');
+			setHTML('txHash', `<b>txHash:</b> ${data.transactionHash}`);
+		} catch (err) {
+			const msg = (err && (err.reason || err.message)) || 'Failed to send transaction';
+			setText('status', 'Error');
+			setText('error', msg);
+		}
+	});
+	</script>
+</body>
+</html>
