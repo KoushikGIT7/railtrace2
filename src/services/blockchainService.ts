@@ -2,23 +2,30 @@ import { ethers } from 'ethers';
 import { db } from '../config/firebase';
 import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
-// Endpoints from env
-const RELAYER_ENDPOINT = (import.meta as { env?: { VITE_RELAYER_ENDPOINT?: string } }).env?.VITE_RELAYER_ENDPOINT || 'http://localhost:8787/relayer';
+// Railway Server Configuration
+const RELAYER_ENDPOINT = (import.meta as { env?: { VITE_RELAYER_URL?: string } }).env?.VITE_RELAYER_URL || 'https://discerning-wonder-production-3da7.up.railway.app/relayer';
+const RAILWAY_API_URL = (import.meta as { env?: { VITE_RELAYER_URL?: string } }).env?.VITE_RELAYER_URL || 'https://discerning-wonder-production-3da7.up.railway.app';
 const RPC_URL = (import.meta as { env?: { VITE_BLOCKCHAIN_RPC_URL?: string } }).env?.VITE_BLOCKCHAIN_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/';
-const CONTRACT_ADDRESS = (import.meta as { env?: { VITE_CONTRACT_ADDRESS?: string } }).env?.VITE_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000';
+const CONTRACT_ADDRESS = (import.meta as { env?: { VITE_CONTRACT_ADDRESS?: string } }).env?.VITE_CONTRACT_ADDRESS || '0x48D3250BC9d205877E3D496B20d824dc2Cd4FA96';
 
-// Contract ABI aligned with contracts/RailTrace.sol
+// Contract ABI aligned with contracts/RailTrace.sol (Updated with batch operations)
 const RAILTRACE_ABI = [
 	"event Registered(bytes32 indexed partHash, string metadata, uint256 timestamp)",
 	"event Received(bytes32 indexed partHash, string metadata, uint256 timestamp)",
 	"event Installed(bytes32 indexed partHash, string metadata, uint256 timestamp)",
 	"event Inspected(bytes32 indexed partHash, string metadata, uint256 timestamp)",
 	"event Retired(bytes32 indexed partHash, string metadata, uint256 timestamp)",
+	"event BatchVendorOperations(bytes32[] partHashes, string[] metadataArray, uint256 timestamp)",
+	"event BatchInstallationOperations(bytes32[] partHashes, string[] metadataArray, uint256 timestamp)",
+	"event BatchCompleteLifecycle(bytes32[] partHashes, string[] metadataArray, uint256 timestamp)",
 	"function registerPart(bytes32 partHash, string metadata)",
 	"function receivePart(bytes32 partHash, string metadata)",
 	"function installPart(bytes32 partHash, string metadata)",
 	"function inspectPart(bytes32 partHash, string metadata)",
 	"function retirePart(bytes32 partHash, string metadata)",
+	"function batchVendorOperations(bytes32[] partHashes, string[] metadataArray)",
+	"function batchInstallationOperations(bytes32[] partHashes, string[] metadataArray)",
+	"function batchCompleteLifecycle(bytes32[] partHashes, string[] metadataArray)",
 	"function getPartHistory(bytes32 partHash) view returns (tuple(uint8 status, uint256 timestamp, string metadata)[])"
 ];
 
@@ -74,34 +81,13 @@ class BlockchainService {
 	private provider: ethers.JsonRpcProvider;
 	private contract: ethers.Contract;
   private eventListeners: ((events: BlockchainEvent[]) => void)[] = [];
+  private pollingInterval: NodeJS.Timeout | null = null;
 
   constructor() {
 		this.provider = new ethers.JsonRpcProvider(RPC_URL);
 		this.contract = new ethers.Contract(CONTRACT_ADDRESS, RAILTRACE_ABI, this.provider);
-      this.setupEventListeners();
-	}
-
-	private setupEventListeners() {
-		// Map emitted events into UI-friendly format
-		const map = (type: BlockchainEvent['eventType']) => (partHash: string, metadata: string, timestamp: bigint, event: any) => {
-			let data: Record<string, unknown> = {};
-			try { data = JSON.parse(metadata || '{}'); } catch {}
-			const mapped: BlockchainEvent = {
-				eventType: type,
-				partHash,
-				timestamp: Number(timestamp),
-				data,
-				transactionHash: event?.transactionHash || '',
-				blockNumber: event?.blockNumber ?? 0,
-			};
-			this.pushEvents([mapped]);
-		};
-
-		this.contract.on('Registered', map('registered'));
-		this.contract.on('Received', map('received'));
-		this.contract.on('Installed', map('installed'));
-		this.contract.on('Inspected', map('inspected'));
-		this.contract.on('Retired', map('retired'));
+    console.log('✅ Connected to Railway server:', RAILWAY_API_URL);
+    console.log('🔄 Batch operations enabled');
 	}
 
 	private pushEvents(events: BlockchainEvent[]) {
@@ -113,11 +99,58 @@ class BlockchainService {
 
   public subscribeToEvents(callback: (events: BlockchainEvent[]) => void) {
     this.eventListeners.push(callback);
+    this.startRealtimePolling(); // Start polling for real-time data
     return () => {
       const index = this.eventListeners.indexOf(callback);
 			if (index > -1) this.eventListeners.splice(index, 1);
+      if (this.eventListeners.length === 0) {
+        this.stopRealtimePolling();
+      }
 		};
 	}
+
+  private async startRealtimePolling() {
+    if (this.pollingInterval) return; // Already polling
+    
+    console.log('📡 Real-time polling started');
+    const pollInterval = 30000; // 30 seconds
+    
+    const poll = async () => {
+      try {
+        const response = await fetch(`${RAILWAY_API_URL}/api/events/recent`);
+        const data = await response.json();
+        
+        if (data.events && data.events.length > 0) {
+          const blockchainEvents: BlockchainEvent[] = data.events.map((event: any) => ({
+            eventType: event.event.toLowerCase(),
+            partHash: event.partHash,
+            timestamp: Math.floor(Date.now() / 1000),
+            data: event.metadata || {},
+            transactionHash: event.transactionHash || 'unknown',
+            blockNumber: 0
+          }));
+          
+          this.eventListeners.forEach(callback => callback(blockchainEvents));
+        }
+      } catch (error) {
+        console.warn('Failed to fetch real-time events from server:', error);
+      }
+    };
+    
+    // Initial poll
+    await poll();
+    
+    // Set up interval
+    this.pollingInterval = setInterval(poll, pollInterval);
+  }
+
+  private stopRealtimePolling() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+      console.log('📡 Real-time polling stopped');
+    }
+  }
 
   // Generate unique part hash
   generatePartHash(partData: PartRegistration): string {
@@ -324,6 +357,56 @@ class BlockchainService {
 		} catch {
       return { status: 'failed' };
     }
+  }
+
+  // Batch operation methods for cost optimization
+  async batchVendorOperations(partHashes: string[], metadataArray: string[]): Promise<string> {
+    const payload = { 
+      method: 'batchVendorOperations', 
+      params: { partHashes, metadataArray } 
+    };
+    const res = await this.sendToRelayer(payload);
+    
+    // Persist each part's transaction
+    partHashes.forEach((partHash, index) => {
+      this.saveTxHash(partHash, 'registered', res.transactionHash);
+      this.persistTx(partHash, 'registered', res.transactionHash, JSON.parse(metadataArray[index]));
+    });
+    
+    return res.transactionHash;
+  }
+
+  async batchInstallationOperations(partHashes: string[], metadataArray: string[]): Promise<string> {
+    const payload = { 
+      method: 'batchInstallationOperations', 
+      params: { partHashes, metadataArray } 
+    };
+    const res = await this.sendToRelayer(payload);
+    
+    // Persist each part's transaction
+    partHashes.forEach((partHash, index) => {
+      this.saveTxHash(partHash, 'installed', res.transactionHash);
+      this.persistTx(partHash, 'installed', res.transactionHash, JSON.parse(metadataArray[index]));
+    });
+    
+    return res.transactionHash;
+  }
+
+  async batchCompleteLifecycle(partHashes: string[], metadataArray: string[]): Promise<string> {
+    const payload = { 
+      method: 'batchCompleteLifecycle', 
+      params: { partHashes, metadataArray } 
+    };
+    const res = await this.sendToRelayer(payload);
+    
+    // Persist each part's transaction for all lifecycle stages
+    partHashes.forEach((partHash, index) => {
+      const metadata = JSON.parse(metadataArray[index]);
+      this.saveTxHash(partHash, 'registered', res.transactionHash);
+      this.persistTx(partHash, 'registered', res.transactionHash, metadata);
+    });
+    
+    return res.transactionHash;
   }
 }
 
