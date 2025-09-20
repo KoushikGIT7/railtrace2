@@ -1,13 +1,14 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "railtrace-frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "build:netlify": "npm run build && echo 'Build completed for Netlify deployment'",
     "relayer": "node relayer/index.cjs",
     "compile:solc": "node scripts/compile-solc.cjs",
     "deploy:bsctest": "node scripts/deploy-ethers.cjs"

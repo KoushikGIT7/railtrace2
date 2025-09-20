@@ -1,32 +1,25 @@
 [build]
-  # Build command for Vite
-  command = "npm run build"
-  
-  # Directory to publish
   publish = "dist"
+  command = "npm run build"
 
 [build.environment]
-  # Node.js version
   NODE_VERSION = "18"
 
-# Redirect rules for SPA
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Headers for security
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-XSS-Protection = "1; mode=block"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
+[dev]
+  command = "npm run dev"
+  port = 5173
+  publish = "dist"
 
-# Cache static assets
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
+# Environment variables for production
+[context.production.environment]
+  VITE_RELAYER_URL = "https://discerning-wonder-production-3da7.up.railway.app"
+  VITE_CONTRACT_ADDRESS = "0x48D3250BC9d205877E3D496B20d824dc2Cd4FA96"
+  VITE_BLOCKCHAIN_RPC_URL = "https://data-seed-prebsc-1-s1.binance.org:8545/"
+  VITE_FIREBASE_API_KEY = "your-firebase-api-key"
+  VITE_FIREBASE_AUTH_DOMAIN = "your-firebase-auth-domain"
+  VITE_FIREBASE_PROJECT_ID = "your-firebase-project-id"
